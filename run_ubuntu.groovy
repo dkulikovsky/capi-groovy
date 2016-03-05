@@ -23,36 +23,36 @@ import ru.yandex.schedulers.job.core.*
 groupOwner = new Owner(new OwnerId("dkulikovsky"), 0, ProjectId.DEFAULT);
 schedulerId = new SchedulerId("dkulikovsky_fun_in_production");
 
-public ru.yandex.iss.Resource mkResource(String startURL, String uuid) {
-    ru.yandex.iss.Resource resource = new ru.yandex.iss.Resource();
+def mkResource(String startURL, String uuid) {
+    def resource = new ru.yandex.iss.Resource();
     resource.setUrls(ImmutableList.of(startURL));
     resource.setUuid(uuid);
     return resource;
 }
 
 Workload createWorkload(def hostId){
-    Entity xcalcEntity = new Instance();
-    xcalcEntity.setSlot(new Slot("dkulikovsky_scheduler", hostId.id).toString());
-    xcalcEntity.setTargetState(Goal.ACTIVE.name());
+    Entity jobEntity = new Instance();
+    jobEntity.setSlot(new Slot("dkulikovsky_scheduler", hostId.id).toString());
+    jobEntity.setTargetState(Goal.ACTIVE.name());
 
     SortedMap<String, Resourcelike> resources = new TreeMap<>();
 
-    ru.yandex.iss.Resource iss_hook_start = mkResource("https://keyvalue.qloud.yandex-team.ru/api/versioned/keyvalue/82373b02d9400b56673d9a5f55993b89?version=56d9c30f158e348a67e6928b",
+    def iss_hook_start = mkResource("https://keyvalue.qloud.yandex-team.ru/api/versioned/keyvalue/82373b02d9400b56673d9a5f55993b89?version=56d9c30f158e348a67e6928b",
             "iss_start_hook_simple_bash_sleep");
     resources.put("iss_hook_start", iss_hook_start);
 
-    xcalcEntity.setResources(resources);
+    jobEntity.setResources(resources);
 
     long ram = 8l << 30;
-    //xcalcEntity.container.constraints["cpu_guarantee"] = "0"
-    //xcalcEntity.container.constraints["cpu_limit"] = "50"
-    xcalcEntity.container.constraints["iss_hook_start.memory_guarantee"] = Long.toString(ram)
-    xcalcEntity.container.constraints["memory_limit"] = Long.toString(2 * ram)
-    xcalcEntity.container.constraints["meta.net"] = "macvlan vlan1478 eth0; macvlan vlan767 vlan767"
-    xcalcEntity.container.constraints["meta.ip"] = "eth0 2a02:6b8:c02:1:0:1478:bd29:8bbc"
-    xcalcEntity.container.constraints["meta.hostname"] = "i-bd298bbcb66f.qloud-c.yandex.net"
-    xcalcEntity.container.constraints["meta.virt_mode"] = "os"
-    xcalcEntity.container.constraints["meta.command"] = "/sbin/init"
+    //jobEntity.container.constraints["cpu_guarantee"] = "0"
+    //jobEntity.container.constraints["cpu_limit"] = "50"
+    jobEntity.container.constraints["iss_hook_start.memory_guarantee"] = Long.toString(ram)
+    jobEntity.container.constraints["memory_limit"] = Long.toString(2 * ram)
+    jobEntity.container.constraints["meta.net"] = "macvlan vlan1478 eth0; macvlan vlan767 vlan767"
+    jobEntity.container.constraints["meta.ip"] = "eth0 2a02:6b8:c02:1:0:1478:bd29:8bbc"
+    jobEntity.container.constraints["meta.hostname"] = "i-bd298bbcb66f.qloud-c.yandex.net"
+    jobEntity.container.constraints["meta.virt_mode"] = "os"
+    jobEntity.container.constraints["meta.command"] = "/sbin/init"
 
 
     // build volumes
@@ -69,7 +69,7 @@ Workload createWorkload(def hostId){
 
     Map<String, String> volumeProperties = new HashMap<>();
 
-    Volume volume = VolumeBuilder.start()
+    def volume = VolumeBuilder.start()
             .withQuota(2 * 1024*1024)
             .withQuotaCwd(2 * 1024 * 1024)
             .withLayers(layers)
@@ -78,15 +78,15 @@ Workload createWorkload(def hostId){
             .build();
 
     List<Volume> volumeList = Collections.singletonList(volume);
-    xcalcEntity.setVolumes(volumeList);
+    jobEntity.setVolumes(volumeList);
 
-    ComputingResources compRes = ComputingResourcesBuilder.start()
+    def compRes = ComputingResourcesBuilder.start()
             .add(new CPUPower(0))
             .add(new RAM(ram))
             .add(new HDDSpace(25l << 30))
             .add(new NetworkBandwidth(20L << 20))
             .build();
-    return new Workload(xcalcEntity, groupOwner, compRes, schedulerId, Collections.emptyMap());
+    return new Workload(jobEntity, groupOwner, compRes, schedulerId, Collections.emptyMap());
 }
 
 ///////////////////////////////////////////////////////////////////////
@@ -119,12 +119,13 @@ def hostTransitions = clusterState.hosts.findAll({hostId, host -> hostId =~ "s1-
 })
 
 
-GroupId groupId = new GroupId("dkulikovsky");
-GroupOperationId goId = GroupOperationId.generate();
+def groupId = new GroupId("dkulikovsky");
+def goId = GroupOperationId.generate();
 
-GroupTransition groupTransition = new GroupTransition(goId, groupId, groupOwner, hostTransitions as SortedSet);
-SortedSet<GroupTransition> transitions = ImmutableSortedSet.of(groupTransition);
-ApplyResultEither result = clusterClient.applyAsync(transitions, new SchedulerSignature(schedulerId, "Starting dkulikovsky funny job")).join().get(groupId);
+def transitions = ImmutableSortedSet.of(new GroupTransition(goId, groupId, groupOwner, hostTransitions as SortedSet));
+def result = clusterClient.applyAsync(transitions, new SchedulerSignature(schedulerId, "Starting dkulikovsky funny job")).join().get(groupId);
+
+
 if(result.success){
     println "Deployed!"
     return true
